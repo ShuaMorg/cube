@@ -85,13 +85,15 @@
                 let startIndex = Math.floor(430 / (sampleRate / 2) * bufferLength);
                 let endIndex = Math.ceil(450 / (sampleRate / 2) * bufferLength);
 
-                isSpinning = false;
+                let maxAmplitude = 0;
                 for (let i = startIndex; i <= endIndex; i++) {
-                    if (dataArray[i] > 128) { // Adjust this threshold as needed
-                        isSpinning = true;
-                        break;
+                    if (dataArray[i] > maxAmplitude) {
+                        maxAmplitude = dataArray[i];
                     }
                 }
+
+                // Set a higher threshold to avoid false positives
+                isSpinning = maxAmplitude > 150;
 
                 if (isSpinning) {
                     cube.rotation.x += 0.05;
@@ -117,4 +119,5 @@
     </script>
 </body>
 </html>
+
 
