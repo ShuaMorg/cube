@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotatable Cube</title>
+    <title>Sound Controlled Cube</title>
     <style>
         body, html {
             margin: 0;
@@ -22,9 +22,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
-        let scene, camera, renderer, cube, controls;
+        let scene, camera, renderer, cube, controls, analyser, dataArray;
+        let isSpinning = false;
 
-        function init() {
+        async function init() {
             // Create the scene
             scene = new THREE.Scene();
 
@@ -55,6 +56,9 @@
             // Handle window resize
             window.addEventListener('resize', onWindowResize, false);
 
+            // Set up the microphone input
+            await setupAudio();
+
             // Start the animation loop
             animate();
         }
@@ -68,7 +72,44 @@
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
+
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                let average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+                let scale = 1 + average / 256;
+                cube.scale.set(scale, scale, scale);
+
+                // Check for frequencies between 430 Hz and 450 Hz
+                let sampleRate = analyser.context.sampleRate;
+                let bufferLength = analyser.frequencyBinCount;
+                let startIndex = Math.floor(430 / (sampleRate / 2) * bufferLength);
+                let endIndex = Math.ceil(450 / (sampleRate / 2) * bufferLength);
+
+                isSpinning = false;
+                for (let i = startIndex; i <= endIndex; i++) {
+                    if (dataArray[i] > 128) { // Adjust this threshold as needed
+                        isSpinning = true;
+                        break;
+                    }
+                }
+
+                if (isSpinning) {
+                    cube.rotation.x += 0.05;
+                    cube.rotation.y += 0.05;
+                }
+            }
+
             renderer.render(scene, camera);
+        }
+
+        async function setupAudio() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(stream);
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048; // Increase fftSize for better frequency resolution
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            source.connect(analyser);
         }
 
         // Initialize the scene
@@ -76,3 +117,4 @@
     </script>
 </body>
 </html>
+
